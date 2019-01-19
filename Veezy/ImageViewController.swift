@@ -69,13 +69,23 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
         
         UIView.transition(with: self.placeholderView, duration: 0.5, options: .transitionCrossDissolve, animations: {
             if (asset.mediaSubtypes.contains(.photoLive)) {
-                self.showLivePhoto(asset: asset, imageSize: imageSize, imageManager: imageManager)
+                self.showLivePhoto(asset: asset, imageSize: imageSize, imageManager: imageManager, display: true)
             } else {
-                self.showStaticPhoto(asset: asset, imageSize: imageSize, imageManager: imageManager)
+                self.showStaticPhoto(asset: asset, imageSize: imageSize, imageManager: imageManager, display: true)
             }
         }, completion: {
             (completed: Bool) -> Void in
             self.currentImageIndex += 1
+            
+            // Cache next image
+            if (self.currentImageIndex < self.images.count) {
+                let nextAsset = PHAsset.fetchAssets(withLocalIdentifiers: [self.images[self.currentImageIndex]], options: nil).firstObject!
+                if (nextAsset.mediaSubtypes.contains(.photoLive)) {
+                    self.showLivePhoto(asset: nextAsset, imageSize: imageSize, imageManager: imageManager, display: false)
+                } else {
+                    self.showStaticPhoto(asset: nextAsset, imageSize: imageSize, imageManager: imageManager, display: false)
+                }
+            }
 
             if (self.isAnimating) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(self.chosenInterval), execute: {
@@ -85,7 +95,7 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
         })
     }
     
-    func showStaticPhoto(asset: PHAsset, imageSize: CGSize, imageManager: PHImageManager) {
+    func showStaticPhoto(asset: PHAsset, imageSize: CGSize, imageManager: PHImageManager, display: Bool) {
         let options = PHImageRequestOptions()
         options.deliveryMode = .highQualityFormat // .fastFormat
         options.isNetworkAccessAllowed = true
@@ -93,31 +103,37 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
         
         imageManager.requestImage(for: asset, targetSize: imageSize, contentMode: .aspectFill, options: options, resultHandler: {
             (image, info) -> Void in
-            self.imageView.isHidden = false
-            self.livePhotoView.isHidden = true
-            self.imageView.image = image
+            if (display) {
+                self.imageView.isHidden = false
+                self.livePhotoView.isHidden = true
+                self.imageView.image = image
+            }
         })
     }
     
-    func showLivePhoto(asset: PHAsset, imageSize: CGSize, imageManager: PHImageManager) {
+    func showLivePhoto(asset: PHAsset, imageSize: CGSize, imageManager: PHImageManager, display: Bool) {
         let options = PHLivePhotoRequestOptions()
         options.deliveryMode = .highQualityFormat // .fastFormat
         options.isNetworkAccessAllowed = true
         // options.isSynchronous = true
         
-        self.loopAgain = true
+        if (display) {
+            self.loopAgain = true
+        }
         
         imageManager.requestLivePhoto(for: asset, targetSize: imageSize, contentMode: .aspectFill, options: options, resultHandler: {
             (livePhoto, info) -> Void in
-            self.imageView.isHidden = true
-            self.livePhotoView.isHidden = false
-            self.livePhotoView.livePhoto = livePhoto
-            
-            // Delay live photo playback for 2 seconds, if interval is greater
-            if (self.chosenInterval > 2) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(2), execute: {
-                    self.livePhotoView.startPlayback(with: .full)
-                })
+            if (display) {
+                self.imageView.isHidden = true
+                self.livePhotoView.isHidden = false
+                self.livePhotoView.livePhoto = livePhoto
+                
+                // Delay live photo playback for 2 seconds, if interval is greater
+                if (self.chosenInterval > 2) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(2), execute: {
+                        self.livePhotoView.startPlayback(with: .full)
+                    })
+                }
             }
         })
     }
