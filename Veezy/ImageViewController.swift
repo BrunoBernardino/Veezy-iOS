@@ -61,11 +61,13 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
             self.images.shuffle()
         }
         
-        let imageManager = PHImageManager.default() // PHCachingImageManager()
+        let imageManager = PHImageManager.default()
         
         let asset = PHAsset.fetchAssets(withLocalIdentifiers: [self.images[self.currentImageIndex]], options: nil).firstObject!
         
         let imageSize = CGSize(width: asset.pixelWidth, height: asset.pixelHeight)
+        
+        // NOTE: As a future improvement, here this can potentially only start the transition once it's sure the next asset has been loaded by attempting a synchronous "showStaticPhoto" or "showLivePhoto"
         
         UIView.transition(with: self.placeholderView, duration: 0.5, options: .transitionCrossDissolve, animations: {
             if (asset.mediaSubtypes.contains(.photoLive)) {
@@ -86,36 +88,38 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
                     self.showStaticPhoto(asset: nextAsset, imageSize: imageSize, imageManager: imageManager, display: false)
                 }
             }
-
-            if (self.isAnimating) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(self.chosenInterval), execute: {
-                    self.playSlideshow()
-                })
-            }
         })
     }
     
     func showStaticPhoto(asset: PHAsset, imageSize: CGSize, imageManager: PHImageManager, display: Bool) {
         let options = PHImageRequestOptions()
-        options.deliveryMode = .highQualityFormat // .fastFormat
+        options.deliveryMode = .highQualityFormat
         options.isNetworkAccessAllowed = true
-        options.isSynchronous = true
+        options.isSynchronous = false // Otherwise image can come back as nil if it isn't cached in the device
         
         imageManager.requestImage(for: asset, targetSize: imageSize, contentMode: .aspectFill, options: options, resultHandler: {
             (image, info) -> Void in
+            // print("Finished requesting static photo", asset.localIdentifier)
+            // print(image as Any)
             if (display) {
                 self.imageView.isHidden = false
                 self.livePhotoView.isHidden = true
                 self.imageView.image = image
+                
+                // Move to the next image only after image has finished loading
+                if (self.isAnimating) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(self.chosenInterval), execute: {
+                        self.playSlideshow()
+                    })
+                }
             }
         })
     }
     
     func showLivePhoto(asset: PHAsset, imageSize: CGSize, imageManager: PHImageManager, display: Bool) {
         let options = PHLivePhotoRequestOptions()
-        options.deliveryMode = .highQualityFormat // .fastFormat
+        options.deliveryMode = .highQualityFormat
         options.isNetworkAccessAllowed = true
-        // options.isSynchronous = true
         
         if (display) {
             self.loopAgain = true
@@ -123,6 +127,8 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
         
         imageManager.requestLivePhoto(for: asset, targetSize: imageSize, contentMode: .aspectFill, options: options, resultHandler: {
             (livePhoto, info) -> Void in
+            // print("Finished requesting live photo", asset.localIdentifier)
+            // print(livePhoto as Any)
             if (display) {
                 self.imageView.isHidden = true
                 self.livePhotoView.isHidden = false
@@ -132,6 +138,13 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
                 if (self.chosenInterval > 2) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(2), execute: {
                         self.livePhotoView.startPlayback(with: .full)
+                    })
+                }
+                
+                // Move to the next image only after image has finished loading
+                if (self.isAnimating) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(self.chosenInterval), execute: {
+                        self.playSlideshow()
                     })
                 }
             }
@@ -160,7 +173,6 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
         
         for chosenImage in chosenImages {
             images.append(chosenImage)
-            // TODO: Ask to cache images? https://developer.apple.com/documentation/photos/phcachingimagemanager/1616986-startcachingimages
         }
         
         images.shuffle()
