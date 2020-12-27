@@ -154,6 +154,11 @@ class ImageViewController: UIViewController, UINavigationControllerDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        // Always adopt a light interface style on iOS 13
+        if #available(iOS 13.0, *) {
+            overrideUserInterfaceStyle = .light
+        }
+        
         self.imageView = UIImageView.init(frame: self.view.frame)
         self.livePhotoView = PHLivePhotoView.init(frame: self.view.frame)
         self.livePhotoView.delegate = self

@@ -99,6 +99,11 @@ class ViewController: UIViewController, UINavigationControllerDelegate, UIImageP
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        // Always adopt a light interface style on iOS 13
+        if #available(iOS 13.0, *) {
+            overrideUserInterfaceStyle = .light
+        }
+        
         // Clear past album photos from settings, allowing album to refresh
         defaults.set(chosenImages, forKey: chosenImagesDefaultsKey)
         
